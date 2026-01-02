@@ -1,0 +1,20 @@
+Native C : 
+________________________________________________________
+Executed in    1.77 millis    fish           external
+   usr time    0.42 millis  420.00 micros    0.00 millis
+   sys time    1.41 millis  157.00 micros    1.25 millis
+
+
+
+Native Python :
+________________________________________________________
+Executed in   17.23 millis    fish           external
+   usr time   14.37 millis    1.45 millis   12.92 millis
+   sys time    3.12 millis    0.22 millis    2.90 millis
+
+
+Nuitka : 
+________________________________________________________
+Executed in   51.65 millis    fish           external
+   usr time   28.83 millis    0.13 millis   28.70 millis
+   sys time   22.51 millis    1.07 millis   21.44 millis
