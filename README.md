@@ -1,4 +1,4 @@
-# Suvadu (சுவடு) ⚡
+# Suvadu (சுவடு)
 
 > *"Static analysis is a guess. Tracing is the truth."*
 
@@ -32,7 +32,7 @@ Most transpilers look at code as a dead pile of text. **Suvadu watches it live.*
 
 ---
 
-## 🚀 Usage (PoC)
+## Usage (PoC)
 
 Write your logic in `code.py`, then let Suvadu footprint the execution:
 
