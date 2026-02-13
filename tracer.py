@@ -1,9 +1,6 @@
 import sys, ast, inspect
 from code import main
 
-# ===============================
-# Runtime type tracing
-# ===============================
 runtime_types = {}
 runtime_values = {}
 
@@ -18,15 +15,16 @@ def tracer(frame, event, arg):
     return tracer
 
 sys.settrace(tracer)
-try: main()
-except Exception: pass
+try:
+    main()
+except Exception:
+    pass
 sys.settrace(None)
 
 tree = ast.parse("".join(inspect.getsourcelines(main)[0]))
 
-# ===============================
-# Library Tracking Flags
-# ===============================
+
+# expand later or look for better implementation
 needStdio = False
 needStdlib = False
 needString = False
@@ -37,9 +35,6 @@ def get_c_primitive(name):
     if float in types: return "double"
     return "int"
 
-# ===============================
-# Expression Emitter (With Pointer Aliasing)
-# ===============================
 def emit_expr(node):
     global needString, needStdlib, needMath
     if isinstance(node, ast.Name): return node.id
@@ -82,9 +77,6 @@ def bin_op(op):
 def cmp_op(op):
     return {ast.Lt: "<", ast.Gt: ">", ast.LtE: "<=", ast.GtE: ">=", ast.Eq: "==", ast.NotEq: "!="}[type(op)]
 
-# ===============================
-# Statement Emitter
-# ===============================
 declared = set()
 
 def emit(node, indent=0):
@@ -99,7 +91,14 @@ def emit(node, indent=0):
             fmt, args = [], []
             for arg in call.args:
                 val = emit_expr(arg)
-                t_set = runtime_types.get(arg.id, set()) if isinstance(arg, ast.Name) else {type(arg.value)} if isinstance(arg, ast.Constant) else {int}
+                # Improved type detection for print
+                if isinstance(arg, ast.Name):
+                    t_set = runtime_types.get(arg.id, set())
+                elif isinstance(arg, ast.Constant):
+                    t_set = {type(arg.value)}
+                else:
+                    t_set = {int}
+
                 if str in t_set: fmt.append("%s")
                 elif float in t_set: fmt.append("%.2f")
                 else: fmt.append("%d")
@@ -144,34 +143,38 @@ def emit(node, indent=0):
     if isinstance(node, ast.Assign):
         target_node = node.targets[0]
 
-        # HUMAN IDIOM: Pointer Aliasing for array writes
         if isinstance(target_node, ast.Subscript):
             name = emit_expr(target_node.value)
             idx = emit_expr(target_node.slice)
             t = get_c_primitive(name)
-            # Instead of index access, humans might use: *(ptr + i) = val
+            # Instead of index access, *(ptr + i) = val . Change later when necessary. This way it looks more like C :)
             return f"{pad}*(({t}*){name}.data + {idx}) = {emit_expr(node.value)};"
 
         name = target_node.id
         var_types = runtime_types.get(name, set())
 
+        # Check if it is a list
+        is_list = (list in var_types) or isinstance(node.value, ast.List)
+
         if name not in declared:
             declared.add(name)
-            if list in var_types:
+            if is_list:
                 needStdlib = True
                 needString = True
                 t = get_c_primitive(name)
+                # Get capacity from runtime or count elements in AST
                 cap = runtime_values.get(name, 8)
                 if isinstance(node.value, ast.List):
                     elements = [emit_expr(e) for e in node.value.elts]
                     n = len(elements)
-                    return (f"{pad}List {name}; list_init(&{name}, sizeof({t}), {n});\n"
+                    cap = max(cap, n)
+                    return (f"{pad}List {name}; list_init(&{name}, sizeof({t}), {cap});\n"
                             f"{pad}{{ {t} _tmp[] = {{{', '.join(elements)}}}; "
                             f"memcpy({name}.data, _tmp, sizeof(_tmp)); }}\n"
                             f"{pad}{name}.size = {n};")
                 return f"{pad}List {name}; list_init(&{name}, sizeof({t}), {cap});\n{pad}{name}.size = {cap};"
 
-            # POINTER DECISION: If a variable aliases a complex expression, a human might use a pointer
+            # POINTER DECISION: If a variable aliases a complex expression, a person might use a pointer
             # For now, we keep primitives as values for performance.
             t = "double" if float in var_types else "int"
             return f"{pad}{t} {name} = {emit_expr(node.value)};"
@@ -184,9 +187,8 @@ def emit(node, indent=0):
         return f"{pad}{'break' if isinstance(node, ast.Break) else 'continue'};"
     return ""
 
-# ===============================
+
 # Generation
-# ===============================
 body_code = []
 for stmt in tree.body[0].body:
     res = emit(stmt, 1)
@@ -204,3 +206,6 @@ if needStdlib:
 print("\nint main() {")
 print("\n".join(body_code))
 print("    return 0;\n}")
+print("For debugging : ")
+print(runtime_types)
+print(runtime_values)
